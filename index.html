@@ -1,0 +1,1098 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Road Accident Monitoring Dashboard</title>
+
+    <!-- Google Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚦</text></svg>">
+
+    <style>
+        :root{
+            --bg:#070812; /* deep space */
+            --card:#071022; /* card background */
+            --primary:#00e6ff; /* neon cyan */
+            --accent:#ff3dcb; /* neon magenta */
+            --success:#00ff9d; /* neon green */
+            --muted:#98a3b3; /* subdued text */
+            --glass: rgba(255,255,255,0.03);
+            --glow: 0 8px 40px rgba(0,230,255,0.06);
+        }
+        *{box-sizing:border-box}
+        body {
+            font-family: 'Poppins', Arial, sans-serif;
+            background:
+              radial-gradient(600px 400px at 10% 10%, rgba(0,230,255,0.03), transparent 10%),
+              radial-gradient(500px 300px at 90% 80%, rgba(255,61,203,0.02), transparent 8%),
+              linear-gradient(180deg,#04050a 0%, var(--bg) 100%);
+            margin:0;
+            padding:32px;
+            color:#e7fbff;
+            -webkit-font-smoothing:antialiased;
+            -moz-osx-font-smoothing:grayscale;
+        }
+        .container{
+            margin:0 auto;
+        }
+        header{
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            margin-bottom:22px;
+            animation: slideInLeft 0.8s ease-out;
+        }
+        header h1{
+            margin:0;
+            font-size:20px;
+            letter-spacing:0.2px;
+            color:var(--primary);
+            text-shadow:0 2px 18px rgba(0,230,255,0.08);
+        }
+        .grid{
+            display:grid;
+            grid-template-columns:1fr 380px;
+            gap:20px;
+            align-items:start;
+        }
+        .card{
+            background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)), linear-gradient(90deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.05) 50%, rgba(255,255,255,0.02) 100%);
+            background-size:100% 100%, 200% 100%;
+            background-position:0 0, -200% 0;
+            border:1px solid rgba(0,230,255,0.06);
+            border-radius:12px;
+            padding:20px;
+            box-shadow:var(--glow);
+            opacity:0;
+            transform:translateY(8px);
+            animation:fadeInUp .45s ease forwards, slideInLeft 0.8s ease-out, shimmer 3s infinite;
+            color:#dffaff;
+        }
+        .card:hover{box-shadow:0 12px 40px rgba(0,230,255,0.06), 0 2px 8px rgba(0,0,0,0.6);animation: glowPulse 2s infinite}
+        .fa-traffic-light{animation: float 3s ease-in-out infinite;}
+        .card.delay{animation:fadeInUp .45s ease forwards .06s, slideInRight 0.8s ease-out .06s;}
+        .form-row{margin-bottom:14px}
+        label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+        input[type=text], select{
+            width:100%;
+            padding:10px 12px;
+            border-radius:8px;
+            border:1px solid rgba(255,255,255,0.04);
+            background:rgba(255,255,255,0.01);
+            color:var(--muted);
+            font-size:14px;
+            transition:box-shadow .12s ease, transform .12s ease, border-color .12s ease;
+        }
+        input[type=text]::placeholder{color:#50606f}
+        input[type=text]:focus, select:focus{box-shadow:0 8px 24px rgba(0,230,255,0.06);transform:translateY(-1px);border-color:rgba(0,230,255,0.12);color:#e9ffff}
+        button{
+            padding:10px 14px;
+            background:linear-gradient(90deg,var(--primary), #6ff7ff);
+            color:#001416;
+            border:none;
+            border-radius:8px;
+            cursor:pointer;
+            font-weight:700;
+            letter-spacing:0.2px;
+            transition:transform .12s ease, box-shadow .12s ease, filter .12s ease;
+            box-shadow:0 6px 28px rgba(0,230,255,0.06);
+        }
+        button.secondary{
+            background:transparent;
+            color:var(--primary);
+            box-shadow:none;
+            border:1px solid rgba(0,230,255,0.08);
+        }
+        button:hover{transform:translateY(-3px) scale(1.02);filter:brightness(1.05);box-shadow:0 14px 36px rgba(0,230,255,0.08);animation: bounceIn 0.5s ease}
+
+        .muted{color:var(--muted);font-size:13px}
+        .violations-list{max-height:300px;overflow:auto;margin-top:12px}
+        .violation-item{padding:10px;border-radius:8px;border:1px solid rgba(0,230,255,0.06);margin-bottom:8px;background:linear-gradient(180deg,rgba(255,255,255,0.01),rgba(255,255,255,0.00));opacity:0;transform:translateY(6px) scale(.998);animation:fadeInItem .34s ease forwards;color:#eafcff}
+        .violation-item.pop{animation:pop .36s cubic-bezier(.22,.9,.3,1);box-shadow:0 6px 24px rgba(0,230,255,0.06)}
+        .analytics-pre{background:linear-gradient(90deg,#001217,#031728);color:var(--primary);padding:14px;border-radius:8px;font-family:monospace;border:1px solid rgba(0,230,255,0.04)}
+
+        /* Recommendation Cards */
+        .rec-card{display:flex;gap:10px;align-items:start;padding:12px;background:rgba(255,255,255,0.02);border-left:3px solid var(--primary);border-radius:0 6px 6px 0;margin-bottom:8px;font-size:13px;line-height:1.5;animation:fadeInItem .4s ease forwards}
+        .rec-card.priority{background:rgba(255,61,203,0.04);border-left-color:var(--accent)}
+        .rec-card i{margin-top:3px}
+        .rec-card.priority i{color:var(--accent)}
+        .rec-card:not(.priority) i{color:var(--primary)}
+
+        .stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}
+        .stat-card{padding:12px;border-radius:10px;background:linear-gradient(180deg, rgba(0,0,0,0.03), rgba(255,255,255,0.01));text-align:center;border:1px solid rgba(0,230,255,0.03);animation: fadeInDown 0.6s ease-out;}
+        .stat-card h4{margin:0;font-size:12px;color:var(--muted)}
+        .stat-card .num{font-size:20px;font-weight:700;color:var(--accent);margin-top:6px;text-shadow:0 6px 20px rgba(255,61,203,0.06)}
+        .stat-card:nth-child(1){animation-delay:0s}
+        .stat-card:nth-child(2){animation-delay:0.1s}
+        .stat-card:nth-child(3){animation-delay:0.2s}
+
+        @media (max-width:880px){
+            .grid{grid-template-columns:1fr;}
+            .stats-grid{grid-template-columns:repeat(3,1fr);}
+            .charts-grid{grid-template-columns:1fr !important;}
+        }
+        .toast{position:fixed;right:20px;bottom:20px;background:linear-gradient(90deg,var(--success), #00ffc1);color:#001416;padding:10px 14px;border-radius:10px;opacity:0;transform:translateY(10px);transition:all .22s cubic-bezier(.2,.9,.3,1);box-shadow:0 8px 40px rgba(0,255,160,0.06)}
+        .toast.show{opacity:1;transform:translateY(0)}
+
+        /* Preview modal content tweaks */
+        #preview-content{font-family:monospace;font-size:13px;color:var(--muted);max-height:420px;overflow:auto;padding:6px;border-radius:6px;background:rgba(0,0,0,0.03)}
+        #sheet-select{margin-left:8px;padding:6px;border-radius:6px;background:rgba(255,255,255,0.02);color:var(--muted)}
+        #show-more-btn{margin-left:8px}
+        .progress-wrap{margin-top:10px;display:none}
+        .progress-bar{width:260px;max-width:60vw;height:10px;background:rgba(255,255,255,0.04);border-radius:6px;overflow:hidden;display:inline-block;vertical-align:middle}
+        .progress-bar > div{height:100%;width:0;background:linear-gradient(90deg,var(--primary),var(--accent));transition:width .18s ease}
+        #upload-progress-text{font-size:12px;color:var(--muted);margin-top:6px;margin-left:8px}
+        .preview-table td{padding:6px;border-bottom:1px solid rgba(255,255,255,0.03);font-size:13px;color:#eafcff}
+        .preview-table th{padding:6px;border-bottom:1px solid rgba(255,255,255,0.04);font-weight:600;color:var(--muted);text-align:left} 
+
+        /* Global upload progress in header */
+        #global-upload{display:none;align-items:center;gap:8px;margin-left:12px}
+        #global-upload .progress-bar{width:160px;height:8px;background:rgba(255,255,255,0.03);border-radius:6px;overflow:hidden}
+        #global-upload .progress-bar > div{height:100%;width:0;background:linear-gradient(90deg,var(--primary),var(--accent));transition:width .12s ease}
+        #global-upload-text{font-size:12px;color:var(--muted);margin-left:6px}
+        #global-upload-cancel{padding:6px 8px;font-size:12px;margin-left:6px;border-radius:6px}
+        #global-upload-cancel.secondary{background:transparent} 
+
+        /* Animations */
+        @keyframes fadeInUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
+        @keyframes fadeInDown{from{opacity:0;transform:translateY(-20px)}to{opacity:1;transform:none}}
+        @keyframes slideInLeft{from{opacity:0;transform:translateX(-30px)}to{opacity:1;transform:none}}
+        @keyframes slideInRight{from{opacity:0;transform:translateX(30px)}to{opacity:1;transform:none}}
+        @keyframes bounceIn{0%{opacity:0;transform:scale(.3)}50%{opacity:1;transform:scale(1.05)}70%{transform:scale(.9)}100%{opacity:1;transform:scale(1)}}
+        @keyframes glowPulse{0%,100%{box-shadow:0 8px 40px rgba(0,230,255,0.06)}50%{box-shadow:0 8px 60px rgba(0,230,255,0.15)}}
+        @keyframes fadeInItem{from{opacity:0;transform:translateY(15px) scale(.98)}to{opacity:1;transform:none}}
+        @keyframes pop{0%{transform:scale(.95)}50%{transform:scale(1.02)}100%{transform:scale(1)}}
+        @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+        @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+
+        @media print {
+            body { background: #fff; color: #000; }
+            .card { background: #fff; color: #000; border: 1px solid #ccc; box-shadow: none; opacity: 1 !important; transform: none !important; }
+            button, input, select, .toast, #global-upload, #dataset-info, .fa-traffic-light { display: none !important; }
+            header a { display: none !important; }
+            .muted { color: #444 !important; }
+            h1, h2, h3, h4, h5 { color: #000 !important; text-shadow: none !important; }
+            canvas { max-width: 100%; }
+        }
+    </style> 
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <div style="display:flex;align-items:center;gap:12px">
+            <i class="fas fa-traffic-light" style="font-size:24px;color:var(--primary)"></i>
+            <div>
+                <h1 style="margin:0;font-size:22px">Road Accident Monitoring Dashboard</h1>
+                <div class="muted" style="font-size:12px;margin-top:2px">Advanced Road Accident Monitoring & Analytics Dashboard</div>
+            </div>
+        </div>
+        <div style="display:flex;gap:12px;align-items:center">
+            <div id="dataset-info" class="muted">
+                <i class="fas fa-server" style="margin-right:4px"></i>Local demo • <small>127.0.0.1:5000</small>
+            </div>
+            <div id="global-upload">
+                <div class="progress-bar"><div id="global-upload-bar"></div></div>
+                <div id="global-upload-text" class="muted">0%</div>
+                <button id="global-upload-cancel" class="secondary" onclick="cancelUpload()">Cancel</button>
+            </div>
+            <button class="secondary" onclick="window.print()" style="display:flex;align-items:center;gap:6px;margin-right:8px">
+                <i class="fas fa-print"></i> Print
+            </button>
+            <a class="muted" href="/dataset" style="display:flex;align-items:center;gap:4px">
+                <i class="fas fa-chart-bar"></i>View Dataset
+            </a>
+        </div>
+    </header>
+
+    <div class="grid">
+
+        <div class="card delay">
+            <h3 style="margin-top:0">Analytics</h3>
+<div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
+                <div style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.03);padding:4px 8px;border-radius:8px;border:1px solid rgba(255,255,255,0.05)">
+                    <span class="muted" style="font-size:12px">From</span>
+                    <input type="date" id="filter-start" style="padding:4px;width:110px;font-size:12px">
+                    <span class="muted" style="font-size:12px">To</span>
+                    <input type="date" id="filter-end" style="padding:4px;width:110px;font-size:12px">
+                </div>
+                <button class="secondary" onclick="loadAnalytics()">View Analytics</button>
+                <button class="secondary" onclick="clearData()">Reset Data</button>
+                <button class="secondary" onclick="deleteFilesOnly()">Delete files only</button>
+                <label style="display:flex;gap:6px;align-items:center" title="Delete uploaded files from disk when clearing">
+                    <input id="clear-delete-files" type="checkbox" style="width:14px;height:14px"> <span class="muted">Delete uploaded files</span>
+                </label>
+            </div>
+
+            <div id="analytics-stats" class="stats-grid">
+                <div class="stat-card">
+                    <h4>Total Violations</h4>
+                    <div id="stat-total" class="num">0</div>
+                </div>
+                <div class="stat-card">
+                    <h4>Over Speed</h4>
+                    <div id="stat-overspeed" class="num">0</div>
+                </div>
+                <div class="stat-card">
+                    <h4>Signal Jump</h4>
+                    <div id="stat-signal" class="num">0</div>
+                </div>
+            </div>
+
+            <div id="recommendations-section" style="margin-top:16px;display:none">
+                <h4 style="margin:0 0 10px 0;color:var(--primary);font-size:14px;display:flex;align-items:center"><i class="fas fa-robot" style="margin-right:8px"></i>AI Recommendations</h4>
+                <div id="recommendations-list"></div>
+            </div>
+
+            <div style="margin-top:12px">
+                <pre id="analytics" class="analytics-pre">No data yet — click "View Analytics"</pre>
+                
+                <!-- Safety Stats Table -->
+                <div id="safety-stats-section" style="display:none;margin-top:12px;background:rgba(255,255,255,0.02);padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.05)">
+                    <h4 style="margin:0 0 10px 0;color:var(--primary);font-size:14px">
+                        Road Safety Report (2017 vs 2018)
+                        <button class="secondary" style="float:right;font-size:11px;padding:4px 8px;margin-top:-4px" onclick="downloadSafetyStatsCSV()">Download CSV</button>
+                    </h4>
+                    <div style="overflow-x:auto">
+                        <table style="width:100%;border-collapse:collapse;font-size:13px;color:#ccc">
+                            <thead>
+                                <tr style="border-bottom:1px solid rgba(255,255,255,0.1);text-align:left">
+                                    <th style="padding:8px">Metric</th>
+                                    <th style="padding:8px">2017</th>
+                                    <th style="padding:8px">2018</th>
+                                    <th style="padding:8px">% Change</th>
+                                </tr>
+                            </thead>
+                            <tbody id="safety-stats-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="charts-grid" style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+                    <div style="background:rgba(255,255,255,0.01);padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,0.03);height:300px;position:relative">
+                        <h5 class="muted" style="margin:0 0 10px 0;text-align:center">Violations by Type</h5>
+                        <canvas id="analytics-chart" height="220"></canvas>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.01);padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,0.03);height:300px;position:relative">
+                        <h5 class="muted" style="margin:0 0 10px 0;text-align:center">Violations by Hour</h5>
+                        <canvas id="hour-chart" height="220"></canvas>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.01);padding:12px;border-radius:12px;border:1px solid rgba(255,255,255,0.03);height:300px;position:relative">
+                        <h5 class="muted" style="margin:0 0 10px 0;text-align:center">Severity (Killed vs Injured)</h5>
+                        <canvas id="safety-chart" height="220"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card delay" style="margin-top:18px">
+            <h3 style="margin-top:0">Dataset — All Records
+                <button class="secondary" style="float:right;margin-left:8px" onclick="downloadCSV()">Download CSV</button>
+          <label id="upload-label" class="secondary" style="float:right; margin-right:8px; padding:8px 10px; border-radius:8px; cursor:pointer;">
+                    Upload CSV / XLSX
+                    <input id="upload-input" type="file" accept=".csv,.xlsx" style="display:none" onchange="handleFileSelect(this.files)">
+                </label>
+                <label style="float:right;margin-right:8px;display:flex;align-items:center;gap:6px" title="Replace existing dataset (checked) or append">
+                    <input id="upload-replace" type="checkbox" checked style="width:14px;height:14px"> <span class="muted">Replace</span>
+                </label>
+            </h3>
+            <div id="dataset-count" class="muted" style="margin-bottom:8px">Loading…</div>
+            <div style="overflow:auto; max-height:360px; border-top:1px solid rgba(255,255,255,0.02); padding-top:8px">
+                <table id="dataset-table" style="width:100%; border-collapse:collapse;">
+                    <thead></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card delay" style="margin-top:18px">
+            <h3 style="margin-top:0">Traffic Map</h3>
+            <div id="map" style="height:400px;width:100%;border-radius:8px;"></div>
+        </div>
+
+    </div>
+</div>
+
+<div id="toast" class="toast">Saved</div>
+
+<!-- Preview Modal for CSV/XLSX -->
+<div id="preview-modal" style="display:none;position:fixed;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,0.6);align-items:center;justify-content:center;z-index:9999;">
+  <div style="background:var(--card);padding:18px;border-radius:12px;max-width:1000px;width:95%;max-height:90%;overflow:auto;color:#eafcff;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <h3 id="preview-title" style="margin:0">Preview</h3>
+      <div>
+        <select id="sheet-select" style="display:none"></select>
+      </div>
+    </div>
+    <div id="preview-content" style="font-family:monospace;font-size:13px;color:var(--muted);"></div>
+
+    <div id="preview-controls" style="margin-top:12px;display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <button class="secondary" onclick="closePreview()">Cancel</button>
+        <button class="secondary" id="show-more-btn" onclick="increasePreviewRows()" style="display:none;margin-left:8px">Show more</button>
+      </div>
+      <div style="text-align:right">
+        <div id="upload-progress" class="progress-wrap" style="display:none">
+          <div class="progress-bar"><div id="upload-progress-bar"></div></div>
+          <div id="upload-progress-text"></div>
+        </div>
+        <button id="confirm-upload-btn" onclick="confirmUpload()">Upload</button>
+      </div>
+    </div>
+  </div>
+</div> 
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- SheetJS for client-side XLSX preview -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Google Maps API -->
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDPVp0cIs1Ywv_QGWcijPHytZkfJwR25Xk&libraries=visualization&callback=initMap"></script>
+<script>
+const base = 'http://127.0.0.1:5000';
+
+function showToast(msg){
+    const t = document.getElementById('toast');
+    t.innerText = msg;
+    t.classList.add('show');
+    setTimeout(()=>t.classList.remove('show'), 2000);
+}
+
+
+function refreshViolations(){
+    fetch(`${base}/violations`)
+    .then(res=>res.json())
+    .then(list =>{
+        fullDataset = list || [];
+        const container = document.getElementById('violations');
+        const info = document.getElementById('dataset-info');
+        container.innerHTML='';
+        if(!list || list.length===0){
+            container.innerHTML='<div class="muted">No violations recorded yet.</div>';
+            if(info) info.innerHTML = 'No dataset loaded';
+            renderDataset([]);
+            return;
+        }
+        if(info) info.innerHTML = `Loaded ${list.length} record${list.length>1?'s':''} • <small>127.0.0.1:5000</small>`;
+        list.slice().reverse().forEach((v, idx)=>{
+            const el = document.createElement('div');
+            el.className='violation-item';
+            if(idx===0) el.classList.add('pop');
+            el.innerHTML = `<strong>${v.vehicle || '—'}</strong> <span class="muted">• ${v.type || '—'}</span>${v.location?`<div class="muted" style="font-size:12px">${v.location}</div>`:''}${v.date?`<div class="muted" style="font-size:12px">${v.date}</div>`:''}`;
+            container.appendChild(el);
+        });
+        // render full table
+        renderDataset(fullDataset);
+    })
+    .catch(()=>{});
+}
+
+function animateCount(el, start, end, duration=700){
+    const range = end - start;
+    const startTime = performance.now();
+    function step(now){
+        const p = Math.min((now - startTime)/duration,1);
+        const val = Math.floor(start + range * p);
+        el.innerText = val;
+        if(p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+}
+
+let violationChart = null;
+let hourChart = null;
+let safetyChart = null;
+let fullDataset = []; // holds all records fetched from /violations for table and CSV export
+let currentSafetyStats = null; // holds safety stats for export
+function updateChart(by_type){
+    const canvas = document.getElementById('analytics-chart');
+    if(!canvas) return;
+    const ctx = canvas.getContext('2d');
+    let labels = Object.keys(by_type || {});
+    let data = labels.map(k=> by_type[k] || 0);
+    if(labels.length === 0){
+        labels = ['No data'];
+        data = [0];
+    }
+    if(violationChart) violationChart.destroy();
+    violationChart = new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels,
+            datasets: [{
+                label: 'Violations by Type',
+                data,
+                backgroundColor: labels.map((l,i)=> ['#00e6ff','#ff3dcb','#00ff9d','#ffc857','#8e44ad'][i%5]),
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'right',
+                    labels: {
+                        boxWidth: 20,
+                        padding: 20,
+                        font: {
+                            size: 14
+                        },
+                        color: '#98a3b3'
+                    }
+                },
+            }
+        }
+    });
+}
+
+function updateHourChart(by_hour){
+    const canvas = document.getElementById('hour-chart');
+    if(!canvas) return;
+    const ctx = canvas.getContext('2d');
+    
+    // Ensure 0-23 keys exist
+    const labels = Array.from({length: 24}, (_, i) => `${i}:00`);
+    const data = labels.map((_, i) => by_hour[String(i)] || by_hour[i] || 0);
+
+    if(hourChart) hourChart.destroy();
+    hourChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [{
+                label: 'Violations',
+                data,
+                backgroundColor: '#00e6ff',
+                borderRadius: 4,
+                hoverBackgroundColor: '#ff3dcb'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                y: { 
+                    beginAtZero: true, 
+                    grid: { color: 'rgba(255,255,255,0.05)' },
+                    ticks: { color: '#98a3b3' }
+                },
+                x: { 
+                    grid: { display: false },
+                    ticks: { color: '#98a3b3', maxTicksLimit: 8 }
+                }
+            }
+        }
+    });
+}
+
+function updateSafetyChart(stats){
+    const canvas = document.getElementById('safety-chart');
+    if(!canvas) return;
+    const ctx = canvas.getContext('2d');
+    
+    const killed = (stats.killed_2017 || 0) + (stats.killed_2018 || 0);
+    const injured = (stats.injured_2017 || 0) + (stats.injured_2018 || 0);
+    
+    if(safetyChart) safetyChart.destroy();
+    safetyChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Persons Killed', 'Persons Injured'],
+            datasets: [{
+                data: [killed, injured],
+                backgroundColor: ['#ff4d4d', '#ffc857'],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: { color: '#98a3b3', padding: 20 }
+                }
+            }
+        }
+    });
+}
+
+function loadAnalytics(){
+    const start = document.getElementById('filter-start').value;
+    const end = document.getElementById('filter-end').value;
+    const params = new URLSearchParams();
+    if(start) params.append('start_date', start);
+    if(end) params.append('end_date', end);
+
+    fetch(`${base}/analytics?${params.toString()}`)
+    .then(r=>r.json())
+    .then(data=>{
+        document.getElementById('analytics').innerText = JSON.stringify(data, null, 2);
+
+        // update chart with breakdown
+        updateChart(data.by_type || {});
+        updateHourChart(data.by_hour || {});
+        updateSafetyChart(data.safety_stats || {});
+
+        const total = data.total_violations || 0;
+        const overspeedCount = data.over_speed || 0;
+        const signalCount = data.signal_jump || 0;
+
+        animateCount(document.getElementById('stat-total'), 0, total);
+        animateCount(document.getElementById('stat-overspeed'), 0, overspeedCount || 0);
+        animateCount(document.getElementById('stat-signal'), 0, signalCount || 0);
+
+        [ 'stat-total','stat-overspeed','stat-signal' ].forEach(id=>{
+            const el = document.getElementById(id);
+            el.parentElement.classList.add('pop');
+            setTimeout(()=>el.parentElement.classList.remove('pop'), 420);
+        });
+
+        // Render Recommendations
+        const recSection = document.getElementById('recommendations-section');
+        const recList = document.getElementById('recommendations-list');
+        if(data.recommendations && data.recommendations.length > 0){
+            recSection.style.display = 'block';
+            recList.innerHTML = data.recommendations.map(r => {
+                const isPriority = r.toLowerCase().includes('priority');
+                const icon = isPriority ? 'fa-exclamation-circle' : 'fa-info-circle';
+                return `<div class="rec-card ${isPriority?'priority':''}"><i class="fas ${icon}"></i><div>${r}</div></div>`;
+            }).join('');
+        } else {
+            recSection.style.display = 'none';
+        }
+
+        // Render Safety Stats
+        const stats = data.safety_stats;
+        currentSafetyStats = stats;
+        const statsSection = document.getElementById('safety-stats-section');
+        const statsBody = document.getElementById('safety-stats-body');
+        
+        // Only show if we have non-zero data
+        if (stats && (stats.accidents_2017 > 0 || stats.accidents_2018 > 0)) {
+            statsSection.style.display = 'block';
+            const formatPct = (val) => {
+                const color = val > 0 ? '#ff4d4d' : (val < 0 ? '#00ffc1' : '#ccc');
+                return `<span style="color:${color}">${val > 0 ? '+' : ''}${val.toFixed(2)}%</span>`;
+            };
+            
+            statsBody.innerHTML = `
+                <tr><td style="padding:8px">Number of Accidents</td><td style="padding:8px">${stats.accidents_2017}</td><td style="padding:8px">${stats.accidents_2018}</td><td style="padding:8px">${formatPct(stats.pct_accidents)}</td></tr>
+                <tr><td style="padding:8px">Persons Killed</td><td style="padding:8px">${stats.killed_2017}</td><td style="padding:8px">${stats.killed_2018}</td><td style="padding:8px">${formatPct(stats.pct_killed)}</td></tr>
+                <tr><td style="padding:8px">Persons Injured</td><td style="padding:8px">${stats.injured_2017}</td><td style="padding:8px">${stats.injured_2018}</td><td style="padding:8px">${formatPct(stats.pct_injured)}</td></tr>
+            `;
+        } else {
+            statsSection.style.display = 'none';
+        }
+    })
+    .catch(()=>{});
+}
+
+function renderDataset(list){
+    const table = document.getElementById('dataset-table');
+    const countEl = document.getElementById('dataset-count');
+    if(!table) return;
+    table.querySelector('thead').innerHTML = '';
+    table.querySelector('tbody').innerHTML = '';
+    if(!list || list.length === 0){
+        if(countEl) countEl.innerText = 'No records';
+        table.querySelector('tbody').innerHTML = '<tr><td class="muted">No data</td></tr>';
+        return;
+    }
+    const cols = Array.from(list.reduce((s,row)=>{ Object.keys(row).forEach(k=>s.add(k)); return s; }, new Set()));
+    // header
+    const thead = '<tr>' + cols.map(c=>`<th style="text-align:left;padding:8px;border-bottom:1px solid rgba(255,255,255,0.04);font-weight:600;color:var(--muted);">${c}</th>`).join('') + '</tr>';
+    const rows = list.map(r=>'<tr>' + cols.map(c=>`<td style="padding:6px;border-bottom:1px solid rgba(255,255,255,0.03);font-size:13px;color:#eafcff">${r[c] !== undefined ? String(r[c]) : ''}</td>`).join('') + '</tr>').join('');
+    table.querySelector('thead').innerHTML = thead;
+    table.querySelector('tbody').innerHTML = rows;
+    if(countEl) countEl.innerText = `${list.length} record${list.length>1?'s':''}`;
+}
+
+function downloadCSV(){
+    if(!fullDataset || fullDataset.length===0){ showToast('No data to download'); return; }
+    const cols = Array.from(fullDataset.reduce((s,row)=>{ Object.keys(row).forEach(k=>s.add(k)); return s; }, new Set()));
+    const escape = v => '"' + String(v === undefined || v === null ? '' : v).replace(/"/g,'""') + '"';
+    const lines = [cols.join(',')].concat(fullDataset.map(r=>cols.map(c=>escape(r[c])).join(',')));
+    const csv = lines.join('\n');
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'dataset.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+
+function downloadSafetyStatsCSV(){
+    if(!currentSafetyStats){ showToast('No safety stats available'); return; }
+    const s = currentSafetyStats;
+    const rows = [
+        ['Metric', '2017', '2018', '% Change'],
+        ['Number of Accidents', s.accidents_2017, s.accidents_2018, s.pct_accidents.toFixed(2) + '%'],
+        ['Persons Killed', s.killed_2017, s.killed_2018, s.pct_killed.toFixed(2) + '%'],
+        ['Persons Injured', s.injured_2017, s.injured_2018, s.pct_injured.toFixed(2) + '%']
+    ];
+    
+    const csvContent = rows.map(e => e.join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'road_safety_report.csv'; 
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+
+// Quick check to ensure the selected File is accessible and non-empty
+function fileAccessible(file){
+    if(!file){ showToast('No file selected'); return false; }
+    // Some platforms may provide a File object without accessible content (size 0) — treat as inaccessible
+    if(typeof file.size === 'number' && file.size === 0){ console.warn('File appears empty or inaccessible', file); showToast('File appears empty or inaccessible'); return false; }
+    return true;
+}
+
+function handleFileSelect(files){
+    if(!files || files.length===0) return;
+    const file = files[0];
+    if(!fileAccessible(file)){
+        // if file not readable, fallback to direct upload attempt
+        console.warn('handleFileSelect: file not accessible, attempting direct upload');
+        uploadDataset(file);
+        document.getElementById('upload-input').value = '';
+        return;
+    }
+    const name = (file.name || '').toLowerCase();
+
+    if(name.endsWith('.csv')){
+        const reader = new FileReader();
+        reader.onerror = err => {
+            console.error('CSV FileReader error', err);
+            showToast('Cannot access CSV file for preview; attempting server preview');
+            serverPreview(file);
+        };
+        reader.onload = e => {
+            try{
+                const text = e.target.result || '';
+                const allLines = text.split(/\r?\n/).filter(l=>l.trim()!=='');
+                const cols = allLines[0] ? allLines[0].split(',') : [];
+                const rows = allLines.slice(1).map(r=>r.split(','));
+                const meta = { isCsv:true, csvCols: cols, csvRows: rows, rowsShown: 10 };
+                showPreview('CSV Preview — ' + file.name, '', file, meta);
+            }catch(err){
+                console.error('CSV parse error', err);
+                showToast('Failed to parse CSV for preview; uploading instead.');
+                uploadDataset(file);
+            }
+        };
+        reader.readAsText(file);
+    } else if(name.endsWith('.xlsx') || name.endsWith('.xls')){
+        const reader = new FileReader();
+        reader.onerror = err => {
+            console.error('XLSX FileReader error', err);
+            showToast('Cannot access XLSX file for preview; attempting server preview');
+            serverPreview(file);
+        };
+        reader.onload = e => {
+            try{
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, {type:'array'});
+                const arrs = workbook.SheetNames.map(n => XLSX.utils.sheet_to_json(workbook.Sheets[n], {header:1}));
+                const meta = { isXlsx:true, arrs: arrs, sheets: workbook.SheetNames, selectedSheetIndex: 0, rowsShown: 10 };
+                showPreview('XLSX Preview — ' + file.name, '', file, meta);
+            }catch(err){
+                console.error('XLSX parse error', err);
+                showToast('Failed to parse XLSX for preview; uploading instead.');
+                uploadDataset(file);
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    } else {
+        uploadDataset(file);
+    }
+    // clear input
+    document.getElementById('upload-input').value = '';
+}
+
+// Fallback: ask the server to produce a small preview when client-side preview fails or file is inaccessible
+function serverPreview(file){
+    if(!file) return;
+    const fd = new FormData(); fd.append('file', file);
+    fetch(`${base}/preview-dataset`, { method: 'POST', body: fd })
+    .then(res=>res.json())
+    .then(json=>{
+        if(!json || !json.ok){
+            showToast(json && json.error ? ('Preview failed: '+json.error) : 'Preview failed');
+            // fallback to direct upload
+            uploadDataset(file);
+            return;
+        }
+        if(json.type === 'csv'){
+            const meta = { isCsv: true, csvCols: json.columns || [], csvRows: json.rows || [], rowsShown: 10 };
+            showPreview('CSV Preview (server) — ' + (file.name||''), '', file, meta);
+        } else if(json.type === 'xlsx'){
+            const sheets = Object.keys(json.sheets||{});
+            const arrs = sheets.map(s=> (json.sheets[s].rows || []).map(r=>r));
+            const meta = { isXlsx: true, arrs: arrs, sheets: sheets, selectedSheetIndex: 0, rowsShown: 10 };
+            showPreview('XLSX Preview (server) — ' + (file.name||''), '', file, meta);
+        } else {
+            showToast('Preview returned unknown type');
+            uploadDataset(file);
+        }
+    })
+    .catch(err=>{
+        console.error('Server preview error', err);
+        showToast('Server preview failed; uploading instead');
+        uploadDataset(file);
+    });
+}
+
+function uploadDataset(file){
+    if(!file) return;
+    const fd = new FormData();
+    fd.append('file', file);
+    const label = document.getElementById('upload-label');
+    // disable the upload control while uploading
+    if(label){ label.style.opacity = '0.6'; label.style.pointerEvents = 'none'; label.dataset.orig = label.innerText; label.innerText = 'Uploading...'; }
+    showToast('Uploading...');
+
+    // Use AbortController to add a timeout so the user isn't stuck forever
+    const controller = new AbortController();
+    const timeout = setTimeout(()=>{
+        controller.abort();
+        showToast('Upload timed out');
+        if(label){ label.style.opacity=''; label.style.pointerEvents=''; label.innerText = label.dataset.orig || 'Upload CSV / XLSX'; }
+    }, 15000); // 15s
+
+    fetch(`${base}/upload-dataset`, { method: 'POST', body: fd, signal: controller.signal, headers: { 'Accept': 'application/json' } })
+    .then(res=>{
+        clearTimeout(timeout);
+        if(!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+    })
+    .then(json=>{
+        if(label){ label.style.opacity=''; label.style.pointerEvents=''; label.innerText = label.dataset.orig || 'Upload CSV / XLSX'; }
+        if(json && json.uploaded){
+            showToast(`Loaded ${json.total} records`);
+            // refresh UI
+            refreshViolations();
+            loadAnalytics();
+        } else {
+            showToast('Upload failed');
+            console.error('Upload failed', json);
+        }
+    })
+    .catch(err=>{
+        if(label){ label.style.opacity=''; label.style.pointerEvents=''; label.innerText = label.dataset.orig || 'Upload CSV / XLSX'; }
+        if(err.name === 'AbortError'){
+            console.error('Upload aborted', err);
+            // message already shown on timeout
+            return;
+        }
+        showToast('Upload error');
+        console.error(err);
+    });
+}
+
+function showPreview(title, html, file, meta){
+    window._previewFile = file;
+    window._previewData = meta || {};
+    document.getElementById('preview-title').innerText = title;
+    // reset rows shown
+    window._previewRows = Math.max((meta && meta.rowsShown) || 10, 10);
+
+    // If meta provided with structured data, render dynamically, otherwise use provided HTML
+    if(meta && meta.isCsv){
+        renderCSVPreview();
+    } else if(meta && meta.isXlsx){
+        // meta.arrs: array of sheet arrays
+        const sheetSelect = document.getElementById('sheet-select');
+        sheetSelect.innerHTML = meta.sheets.map((s,i)=>`<option value="${i}">${s}</option>`).join('');
+        sheetSelect.style.display = meta.sheets.length>1 ? 'inline-block':'inline-block';
+        sheetSelect.onchange = e => renderPreviewSheet(parseInt(e.target.value,10));
+        sheetSelect.value = meta.selectedSheetIndex || 0;
+        renderPreviewSheet(parseInt(sheetSelect.value,10));
+    } else {
+        document.getElementById('preview-content').innerHTML = html || '';
+        document.getElementById('sheet-select').style.display = 'none';
+    }
+
+    // reset progress UI
+    document.getElementById('upload-progress').style.display = 'none';
+    document.getElementById('upload-progress-bar').style.width = '0%';
+    document.getElementById('upload-progress-text').innerText = '';
+    document.getElementById('preview-modal').style.display = 'flex';
+    document.getElementById('confirm-upload-btn').disabled = false;
+}
+
+function renderCSVPreview(){
+    const meta = window._previewData || {};
+    const cols = meta.csvCols || [];
+    const rows = meta.csvRows || [];
+    const rowsToShow = Math.min(rows.length, window._previewRows || 10);
+    const header = '<thead><tr>' + cols.map(c=>`<th>${escapeHtml(c)}</th>`).join('') + '</tr></thead>';
+    const body = '<tbody>' + rows.slice(0,rowsToShow).map(r=>'<tr>' + cols.map((c,ci)=>`<td>${escapeHtml(r[ci]===undefined?'':r[ci])}</td>`).join('') + '</tr>').join('') + '</tbody>';
+    document.getElementById('preview-content').innerHTML = `<table class="preview-table" style="width:100%;border-collapse:collapse;">${header}${body}</table><div class="muted" style="margin-top:8px">Showing ${rowsToShow} of ${rows.length} rows</div>`;
+    document.getElementById('show-more-btn').style.display = rows.length > rowsToShow ? 'inline-block' : 'none';
+}
+
+function renderPreviewSheet(index){
+    const meta = window._previewData || {};
+    const arrs = meta.arrs || [];
+    const sheet = arrs[index] || [];
+    const rowsToShow = Math.min(sheet.length, window._previewRows || 10);
+    const headerRow = sheet[0] && Array.isArray(sheet[0]) ? sheet[0] : [];
+    const bodyRows = sheet.slice(1, rowsToShow);
+    const header = headerRow.length ? ('<thead><tr>' + headerRow.map(c=>`<th>${escapeHtml(c)}</th>`).join('') + '</tr></thead>') : '';
+    const body = '<tbody>' + bodyRows.map(r=>'<tr>' + (r||[]).map(cell=>`<td>${escapeHtml(cell)}</td>`).join('') + '</tr>').join('') + '</tbody>';
+
+    document.getElementById('preview-content').innerHTML = `<table class="preview-table" style="width:100%;border-collapse:collapse;">${header}${body}</table><div class="muted" style="margin-top:8px">Showing ${Math.max(0,rowsToShow- (headerRow.length?1:0))} rows • Sheet: ${escapeHtml((meta.sheets||[])[index]||'')}</div>`;
+    document.getElementById('show-more-btn').style.display = sheet.length > rowsToShow ? 'inline-block' : 'none';
+}
+
+function increasePreviewRows(){
+    window._previewRows = Math.min((window._previewRows||10) + 40, 1000);
+    const meta = window._previewData || {};
+    if(meta.isCsv) renderCSVPreview();
+    else if(meta.isXlsx){
+        const sel = document.getElementById('sheet-select');
+        renderPreviewSheet(parseInt(sel.value || 0, 10));
+    }
+}
+
+function closePreview(){
+    document.getElementById('preview-modal').style.display = 'none';
+    window._previewFile = null;
+    window._previewData = null;
+}
+
+function confirmUpload(){
+    if(window._previewFile){
+        // disable upload button to prevent double submits
+        document.getElementById('confirm-upload-btn').disabled = true;
+        uploadDataset(window._previewFile, function(){
+            closePreview();
+        });
+    }
+}
+
+function escapeHtml(s){
+    if(s === undefined || s === null) return '';
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function showGlobalUpload(pct){
+    const el = document.getElementById('global-upload');
+    if(!el) return;
+    el.style.display = 'flex';
+    document.getElementById('global-upload-bar').style.width = (pct||0) + '%';
+    document.getElementById('global-upload-text').innerText = (pct||0) + '%';
+}
+
+function hideGlobalUpload(){
+    const el = document.getElementById('global-upload');
+    if(!el) return;
+    el.style.display = 'none';
+    document.getElementById('global-upload-bar').style.width = '0%';
+    document.getElementById('global-upload-text').innerText = '';
+}
+
+function cancelUpload(){
+    if(window._uploadXhr){
+        try{ window._uploadXhr.abort(); }catch(e){}
+        window._uploadXhr = null;
+    }
+    hideGlobalUpload();
+    showToast('Upload cancelled');
+    document.getElementById('confirm-upload-btn').disabled = false;
+    const label = document.getElementById('upload-label');
+    if(label){ label.style.opacity=''; label.style.pointerEvents=''; label.innerText = label.dataset.orig || 'Upload CSV / XLSX'; }
+}
+
+function uploadDataset(file, cb){
+    if(!file) return;
+    const label = document.getElementById('upload-label');
+    if(label){ label.style.opacity = '0.6'; label.style.pointerEvents = 'none'; label.dataset.orig = label.innerText; label.innerText = 'Uploading...'; }
+    showToast('Uploading...');
+
+    const xhr = new XMLHttpRequest();
+    window._uploadXhr = xhr;
+    xhr.open('POST', `${base}/upload-dataset`);
+
+    xhr.upload.onprogress = function(e){
+        if(e.lengthComputable){
+            const pct = Math.round((e.loaded / e.total) * 100);
+            document.getElementById('upload-progress').style.display = 'block';
+            document.getElementById('upload-progress-bar').style.width = pct + '%';
+            document.getElementById('upload-progress-text').innerText = pct + '%';
+            showGlobalUpload(pct);
+        }
+    };
+
+    const timeoutMs = 30000;
+    const to = setTimeout(()=>{
+        try{ xhr.abort(); }catch(e){}
+        window._uploadXhr = null;
+        hideGlobalUpload();
+        showToast('Upload timed out');
+        if(label){ label.style.opacity=''; label.style.pointerEvents=''; label.innerText = label.dataset.orig || 'Upload CSV / XLSX'; }
+        document.getElementById('confirm-upload-btn').disabled = false;
+        if(cb) cb();
+    }, timeoutMs);
+
+    xhr.onload = function(){
+        clearTimeout(to);
+        window._uploadXhr = null;
+        hideGlobalUpload();
+        try{
+            const json = JSON.parse(xhr.responseText || '{}');
+            if(xhr.status >= 200 && xhr.status < 300 && json && json.uploaded){
+                showToast(`Loaded ${json.total} records`);
+                document.getElementById('upload-progress-bar').style.width = '100%';
+                if(label){ label.style.opacity=''; label.style.pointerEvents=''; label.innerText = label.dataset.orig || 'Upload CSV / XLSX'; }
+                // refresh UI
+                refreshViolations();
+                loadAnalytics();
+                if(cb) cb();
+            } else {
+                showToast((json && json.error) ? ('Upload failed: ' + json.error) : 'Upload failed');
+                console.error('Upload failed', json);
+                document.getElementById('confirm-upload-btn').disabled = false;
+            }
+        }catch(err){
+            showToast('Upload response error');
+            console.error(err);
+            document.getElementById('confirm-upload-btn').disabled = false;
+        }
+    };
+
+    xhr.onerror = function(){
+        clearTimeout(to);
+        window._uploadXhr = null;
+        hideGlobalUpload();
+        showToast('Upload error');
+        if(label){ label.style.opacity=''; label.style.pointerEvents=''; label.innerText = label.dataset.orig || 'Upload CSV / XLSX'; }
+        document.getElementById('confirm-upload-btn').disabled = false;
+        if(cb) cb();
+    };
+
+    const fd = new FormData(); fd.append('file', file);
+    // include mode (replace or append)
+    const replaceCheckbox = document.getElementById('upload-replace');
+    const mode = (replaceCheckbox && replaceCheckbox.checked) ? 'replace' : 'append';
+    fd.append('mode', mode);
+    xhr.send(fd);
+}
+
+function deleteFilesOnly(){
+    // ask server how many uploaded files there are first
+    fetch(`${base}/uploaded-files`).then(r=>r.json()).then(json=>{
+        const cnt = json && (json.count || (json.files && json.files.length)) || 0;
+        if(!cnt){ showToast('No uploaded files to delete'); return; }
+        if(!confirm(`This will delete ${cnt} uploaded file${cnt>1? 's' : ''}. Continue?`)) return;
+        fetch(`${base}/delete-uploaded-files`, { method: 'POST' })
+        .then(r=>r.json())
+        .then(res=>{
+            if(res && typeof res.deleted === 'number'){
+                showToast(`Deleted ${res.deleted} file${res.deleted!==1 ? 's' : ''}`);
+            } else {
+                showToast('Deletion failed');
+                console.error('Delete response', res);
+            }
+        })
+        .catch(err=>{ showToast('Network error while deleting files'); console.error(err); });
+    }).catch(err=>{ showToast('Could not fetch uploads info'); console.error(err); });
+}
+
+function clearData(){
+    const deleteFiles = !!document.getElementById('clear-delete-files')?.checked;
+    const msg = deleteFiles ? 'This will remove all records AND delete uploaded files from disk. Continue?' : 'Clear all recorded violations? This will not delete uploaded files. Continue?';
+    if(!confirm(msg)) return;
+    fetch(`${base}/clear-dataset`, { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify({delete_files: deleteFiles}) })
+    .then(r=>r.json())
+    .then(json=>{
+        if(json && json.cleared){
+            showToast('Data cleared');
+            refreshViolations();
+            loadAnalytics();
+            renderDataset([]);
+        } else {
+            showToast('Clear failed');
+            console.error('Clear response', json);
+        }
+    })
+    .catch(err=>{ showToast('Network error while clearing'); console.error(err); });
+}
+
+// Initialize
+refreshViolations();
+loadAnalytics();
+
+function initMap() {
+    const map = new google.maps.Map(document.getElementById('map'), {
+        center: {lat: 0, lng: 0}, // World center
+        zoom: 2
+    });
+    const trafficLayer = new google.maps.TrafficLayer();
+    trafficLayer.setMap(map);
+
+    // Fetch violations and add markers
+    fetch(`${base}/violations`)
+    .then(res => res.json())
+    .then(violations => {
+        const heatmapData = new google.maps.MVCArray();
+        const geocoder = new google.maps.Geocoder();
+        const bounds = new google.maps.LatLngBounds();
+        let hasPoints = false;
+
+        violations.forEach(v => {
+            // 1. Use explicit coordinates if available (preferred)
+            const lat = parseFloat(v.latitude);
+            const lng = parseFloat(v.longitude);
+            
+            if (!isNaN(lat) && !isNaN(lng)) {
+                const pt = new google.maps.LatLng(lat, lng);
+                heatmapData.push(pt);
+                bounds.extend(pt);
+                hasPoints = true;
+            }
+            // 2. Fallback: Geocode address if no coordinates
+            else if (v.location) {
+                geocoder.geocode({address: v.location}, (results, status) => {
+                    if (status === 'OK' && results[0]) {
+                        const loc = results[0].geometry.location;
+                        heatmapData.push(loc);
+                    }
+                });
+            }
+        });
+
+        // Create Heatmap Layer
+        new google.maps.visualization.HeatmapLayer({
+            data: heatmapData,
+            map: map,
+            radius: 30,
+            opacity: 0.8,
+            gradient: [
+                'rgba(0, 255, 255, 0)',  // Transparent (0 density)
+                'rgba(0, 255, 0, 1)',    // Green (Low)
+                'rgba(191, 255, 0, 1)',  // Lime
+                'rgba(255, 255, 0, 1)',  // Yellow
+                'rgba(255, 127, 0, 1)',  // Orange
+                'rgba(255, 0, 0, 1)'     // Red (High)
+            ]
+        });
+
+        if (hasPoints) {
+            map.fitBounds(bounds);
+        }
+    })
+    .catch(err => console.error('Error loading violations for map:', err));
+}
+</script>
+
+</body>
+</html>
+    </div>
+</div>
+
+</body>
+</html>

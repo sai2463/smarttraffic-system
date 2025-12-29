@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Dataset — Smart Traffic Violation</title>
+
+    <!-- Google Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root{--bg:#070812;--card:#071022;--primary:#00e6ff;--accent:#ff3dcb;--muted:#98a3b3;--glow:0 8px 40px rgba(0,230,255,0.06)}
+        *{box-sizing:border-box}
+        body{font-family:'Poppins',Arial,sans-serif;background:linear-gradient(180deg,#04050a 0%,var(--bg)100%);margin:0;padding:28px;color:#e7fbff}
+        .container{max-width:1000px;margin:0 auto}
+        header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+        header h1{margin:0;font-size:18px;color:var(--primary)}
+        .muted{color:var(--muted)}
+        .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border:1px solid rgba(0,230,255,0.06);border-radius:12px;padding:18px;color:#dffaff}
+        .grid{display:grid;grid-template-columns:1fr 420px;gap:18px;align-items:start}
+        table{width:100%;border-collapse:collapse}
+        th,td{padding:8px;border-bottom:1px solid rgba(255,255,255,0.03);font-size:13px;text-align:left}
+        th{color:var(--muted);font-weight:600}
+        .controls{display:flex;gap:8px;align-items:center}
+        button{padding:8px 12px;border-radius:8px;border:none;cursor:pointer;background:linear-gradient(90deg,var(--primary),#6ff7ff);color:#001416;font-weight:700}
+        button.secondary{background:transparent;color:var(--primary);border:1px solid rgba(0,230,255,0.08)}
+        .search{padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:rgba(255,255,255,0.01);color:var(--muted)}
+        @media (max-width:1000px){.grid{grid-template-columns:1fr}}
+
+        /* Toast for short messages */
+        .toast{position:fixed;right:20px;bottom:20px;background:linear-gradient(90deg,var(--primary),#6ff7ff);color:#001416;padding:10px 14px;border-radius:10px;opacity:0;transform:translateY(10px);transition:all .22s cubic-bezier(.2,.9,.3,1);box-shadow:0 8px 40px rgba(0,230,255,0.06)}
+        .toast.show{opacity:1;transform:translateY(0)}
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <h1>📚 <strong>Dataset</strong> — Records & Analysis</h1>
+        <div style="display:flex;gap:10px;align-items:center">
+            <a class="muted" href="/">← Back to Dashboard</a>
+        </div>
+    </header>
+
+    <div class="grid">
+        <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                <div style="display:flex;gap:8px;align-items:center">
+                    <button onclick="refreshTable()">Refresh</button>
+                    <button class="secondary" onclick="downloadCSV()">Download CSV</button>
+                    <button class="secondary" onclick="clearDatasetFromPage()">Clear Data</button>
+                    <button class="secondary" onclick="deleteFilesOnlyFromDataset()">Delete files only</button>
+                    <label id="dataset-upload-label" class="secondary" style="display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border-radius:8px;cursor:pointer">
+                        Upload CSV / XLSX
+                        <input id="dataset-upload-input" type="file" accept=".csv,.xlsx" style="display:none" onchange="handleDatasetFileSelect(this.files)">
+                    </label>
+                    <label style="display:flex;gap:6px;align-items:center;padding-left:6px"><input id="dataset-upload-replace" type="checkbox" checked style="width:14px;height:14px"> <span class="muted">Replace</span></label>
+                    <div id="dataset-upload-progress" style="display:none;align-items:center;gap:8px;margin-left:8px">
+                        <div class="progress-bar" style="width:160px;height:8px;background:rgba(255,255,255,0.03);border-radius:6px;overflow:hidden">
+                            <div id="dataset-upload-progress-bar" style="height:100%;width:0;background:linear-gradient(90deg,var(--primary),var(--accent));transition:width .12s ease"></div>
+                        </div>
+                        <div id="dataset-upload-progress-text" class="muted">0%</div>
+                        <button id="dataset-upload-cancel" class="secondary" onclick="cancelDatasetUpload()" style="margin-left:6px">Cancel</button>
+                    </div>
+                    <label style="display:flex;gap:6px;align-items:center"><input id="dataset-clear-delete" type="checkbox" style="width:14px;height:14px"> <span class="muted">Delete uploaded files</span></label>
+                    <input id="search-input" class="search" placeholder="Search vehicle / type / location" oninput="applySearch()">
+                </div>
+                <div id="dataset-count" class="muted">Loading…</div>
+            </div>
+
+            <div style="overflow:auto; max-height:580px; border-top:1px solid rgba(255,255,255,0.02); padding-top:8px">
+                <table id="dataset-table"><thead></thead><tbody></tbody></table>
+            </div>
+
+            <div id="left-analysis" style="margin-top:12px;">
+                <!-- Analysis moved into left column -->
+
+
+                <div style="margin-top:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                    <div class="muted">Chart type:</div>
+                    <select id="chart-type-select" onchange="onChartTypeChange()" style="padding:6px;border-radius:6px;background:rgba(255,255,255,0.01);color:var(--muted)">
+                        <option value="categorical">Categorical (Bar / Pie)</option>
+                        <option value="time">Time Series (Line)</option>
+                        <option value="numeric">Numeric (Histogram)</option>
+                        <option value="scatter">Scatter (X vs Y)</option>
+                    </select>
+
+                    <div class="muted">Column:</div>
+                    <select id="chart-column-select" onchange="onChartColumnChange()" style="padding:6px;border-radius:6px;background:rgba(255,255,255,0.01);color:var(--muted)"></select>
+
+                    <div id="chart-controls" style="display:flex;gap:8px;align-items:center;margin-left:6px">
+                        <!-- Dynamic controls (bins, top-N, y-axis for scatter) -->
+                        <div id="control-bins" style="display:none;align-items:center"><span class="muted">Bins:</span><input id="hist-bins" type="number" value="10" min="3" max="200" style="width:64px;margin-left:6px;padding:6px;border-radius:6px"></div>
+                        <div id="control-top" style="display:none;align-items:center"><span class="muted">Top N:</span><input id="top-n" type="number" value="10" min="1" max="100" style="width:64px;margin-left:6px;padding:6px;border-radius:6px"></div>
+                        <div id="control-scatter" style="display:none;align-items:center"><span class="muted">Y axis:</span><select id="chart-column-y" style="padding:6px;border-radius:6px;background:rgba(255,255,255,0.01);color:var(--muted)"></select></div>
+                        <button class="secondary" onclick="onChartTypeChange()">Apply</button>
+                        <button class="secondary" style="margin-left:6px" onclick="generateAllCharts()">Generate all</button>
+                    </div>
+                </div>
+
+                <div style="margin-top:12px">
+                    <canvas id="type-chart" height="200"></canvas>
+                </div>
+
+                <div style="margin-top:12px">
+                    <canvas id="pie-chart" height="180"></canvas>
+                </div>
+
+
+                <!-- Auto-generated charts area -->
+                <div id="auto-charts" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-top:12px"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const base = 'http://127.0.0.1:5000';
+
+// Small toast helper for consistent UX
+function showToast(msg){
+    let t = document.getElementById('toast');
+    if(!t){
+        t = document.createElement('div'); t.id='toast'; t.className='toast'; t.innerText=''; document.body.appendChild(t);
+    }
+    t.innerText = msg;
+    t.classList.add('show');
+    setTimeout(()=> t.classList.remove('show'), 2000);
+}
+
+let fullDataset = [];
+let typeChart = null;
+let pieChart = null;
+let currentFilter = '';
+
+function fetchData(){
+    return Promise.all([
+        fetch(`${base}/violations`).then(r=>r.json()).catch(()=>[]),
+        fetch(`${base}/analytics`).then(r=>r.json()).catch(()=>({}))
+    ]);
+}
+
+function refreshTable(){
+    fetchData().then(([list, analytics])=>{
+        fullDataset = list || [];
+        renderTable(fullDataset);
+        populateChartColumns();
+        updateAnalysis(analytics || {});
+    });
+}
+
+function populateChartColumns(){
+    const sel = document.getElementById('chart-column-select');
+    const ysel = document.getElementById('chart-column-y');
+    if(!sel) return;
+    sel.innerHTML = '';
+    if(ysel) ysel.innerHTML = '';
+    if(!fullDataset || fullDataset.length===0){
+        const opt = document.createElement('option'); opt.value=''; opt.innerText = 'No columns'; sel.appendChild(opt); if(ysel) ysel.appendChild(opt.cloneNode(true)); return;
+    }
+    const cols = Array.from(fullDataset.reduce((s,row)=>{Object.keys(row).forEach(k=>s.add(k));return s;}, new Set()));
+    // detect column types (simple heuristics)
+    const numeric = [];
+    const dateCols = [];
+    const categorical = [];
+    for(const c of cols){
+        let numGood=0, numChecked=0, dateGood=0;
+        for(let i=0;i<Math.min(80, fullDataset.length); i++){
+            const v = fullDataset[i][c];
+            if(v === undefined || v === null) continue;
+            numChecked++;
+            const n = Number(String(v).replace(/[,\s]/g,''));
+            if(isFinite(n)) numGood++;
+            if(!isNaN(Date.parse(String(v)))) dateGood++;
+        }
+        if(numChecked && (numGood/numChecked) > 0.75) numeric.push(c);
+        else if(numChecked && (dateGood/numChecked) > 0.6) dateCols.push(c);
+        else categorical.push(c);
+    }
+
+    // store for other functions
+    window._colTypes = { numeric: numeric, date: dateCols, categorical: categorical, all: cols };
+
+    // order options (prefer categorical 'type' first if present)
+    const ordered = cols.slice().sort((a,b)=> (a==='type'? -1: a>b?1:-1));
+    ordered.forEach(c=>{
+        const opt = document.createElement('option'); opt.value = c; opt.innerText = c; sel.appendChild(opt);
+        if(ysel) { const opt2 = opt.cloneNode(true); ysel.appendChild(opt2); }
+    });
+    // select sensible defaults
+    const defaultCol = ordered.includes('type') ? 'type' : ordered[0];
+    sel.value = defaultCol || '';
+    if(ysel) ysel.value = ordered.length>1 ? ordered[1] : ordered[0];
+
+    // set chart-type default: time if date column found, else categorical
+    const typeSel = document.getElementById('chart-type-select');
+    if(typeSel){
+        if(dateCols.length>0) typeSel.value = 'time';
+        else typeSel.value = 'categorical';
+    }
+
+    // update controls visibility
+    onChartTypeChange();
+    // auto render chart for default selection
+    onChartColumnChange();
+}
+
+function onChartColumnChange(){
+    const type = document.getElementById('chart-type-select').value;
+    const col = document.getElementById('chart-column-select').value;
+    if(!col) return;
+    if(type === 'categorical'){
+        // compute counts and top N
+        const topN = parseInt(document.getElementById('top-n')?.value||10,10);
+        const map = {};
+        for(const r of fullDataset){ const v = (r[col]===undefined||r[col]===null)?'':String(r[col]); map[v] = (map[v]||0)+1; }
+        // convert to entries sorted
+        const entries = Object.entries(map).sort((a,b)=>b[1]-a[1]);
+        const trimmed = Object.fromEntries(entries.slice(0, topN));
+        updateCharts(trimmed, col);
+    } else if(type === 'time'){
+        // use the chosen col as timestamp
+        const series = aggregateByDate(fullDataset, col);
+        updateTimeChart(series);
+    } else if(type === 'numeric'){
+        const bins = parseInt(document.getElementById('hist-bins')?.value||10,10);
+        renderHistogram(col, bins);
+    } else if(type === 'scatter'){
+        const ycol = document.getElementById('chart-column-y').value;
+        renderScatter(col, ycol);
+    }
+}
+
+let currentSort = { col: null, dir: 1 }; // dir: 1 asc, -1 desc
+let currentPage = 1;
+let pageSize = 25;
+
+function renderTable(list){
+    const table = document.getElementById('dataset-table');
+    const countEl = document.getElementById('dataset-count');
+    table.querySelector('thead').innerHTML = '';
+    table.querySelector('tbody').innerHTML = '';
+    if(!list || list.length===0){
+        if(countEl) countEl.innerText = 'No records';
+        table.querySelector('tbody').innerHTML = '<tr><td class="muted">No data</td></tr>';
+        renderPagination(0);
+        return;
+    }
+    // apply search filter
+    const q = (document.getElementById('search-input').value || '').trim().toLowerCase();
+    let filtered = list.filter(r=> Object.values(r).some(v=> String(v).toLowerCase().includes(q)));
+
+    // sorting
+    if(currentSort.col){
+        filtered.sort((a,b)=>{
+            const va = a[currentSort.col] === undefined ? '' : String(a[currentSort.col]);
+            const vb = b[currentSort.col] === undefined ? '' : String(b[currentSort.col]);
+            return va.localeCompare(vb, undefined, {numeric:true}) * currentSort.dir;
+        });
+    }
+
+    const total = filtered.length;
+    // pagination
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    if(currentPage > totalPages) currentPage = totalPages;
+    const start = (currentPage - 1) * pageSize;
+    const pageData = filtered.slice(start, start + pageSize);
+
+    const cols = Array.from(list.reduce((s,row)=>{Object.keys(row).forEach(k=>s.add(k));return s;}, new Set()));
+    // header with sort handlers
+    const thead = '<tr>' + cols.map(c=>`<th style="cursor:pointer" onclick="sortBy('${c}')">${c}${currentSort.col===c ? (currentSort.dir===1?' ▲':' ▼') : ''}</th>`).join('') + '</tr>';
+    const rows = pageData.map(r=>'<tr>' + cols.map(c=>`<td>${r[c] !== undefined ? String(r[c]) : ''}</td>`).join('') + '</tr>').join('');
+    table.querySelector('thead').innerHTML = thead;
+    table.querySelector('tbody').innerHTML = rows;
+    if(countEl) countEl.innerText = `${total} record${total>1?'s':''}`;
+    renderPagination(totalPages);
+}
+
+function sortBy(col){
+    if(currentSort.col === col) currentSort.dir = -currentSort.dir;
+    else { currentSort.col = col; currentSort.dir = 1; }
+    renderTable(fullDataset);
+}
+
+function renderPagination(totalPages){
+    let container = document.getElementById('pagination-controls');
+    if(!container){
+        container = document.createElement('div');
+        container.id = 'pagination-controls';
+        container.style = 'display:flex;gap:8px;align-items:center;margin-top:8px;';
+        document.querySelector('.card').appendChild(container);
+    }
+    container.innerHTML = `
+        <div class="muted">Page ${currentPage} / ${totalPages}</div>
+        <div style="display:flex;gap:6px">
+            <button class="secondary" onclick="changePage(1)">Prev</button>
+            <button class="secondary" onclick="changePage(2)">Next</button>
+        </div>
+        <div style="margin-left:auto;display:flex;gap:6px;align-items:center">
+            <div class="muted">Rows:</div>
+            <select onchange="changePageSize(this.value)">
+                <option value="10" ${pageSize==10? 'selected':''}>10</option>
+                <option value="25" ${pageSize==25? 'selected':''}>25</option>
+                <option value="50" ${pageSize==50? 'selected':''}>50</option>
+                <option value="100" ${pageSize==100? 'selected':''}>100</option>
+            </select>
+        </div>
+    `;
+}
+
+function changePage(dir){
+    // dir 1 = prev, 2 = next
+    const totalPages = Math.max(1, Math.ceil((document.getElementById('dataset-count').innerText.split(' ')[0]||0) / pageSize));
+    if(dir===1) currentPage = Math.max(1, currentPage - 1);
+    else currentPage = Math.min(totalPages, currentPage + 1);
+    renderTable(fullDataset);
+}
+
+function changePageSize(v){ pageSize = parseInt(v,10)||25; currentPage = 1; renderTable(fullDataset); }
+
+function updateAnalysis(analytics){
+    // analytics: total_violations, by_type, over_speed, signal_jump
+    const elTotal = document.getElementById('sum-total'); if(elTotal) elTotal.innerText = analytics.total_violations || fullDataset.length || 0;
+    const elSpeed = document.getElementById('sum-speed'); if(elSpeed) elSpeed.innerText = analytics.over_speed || 0;
+    const elSignal = document.getElementById('sum-signal'); if(elSignal) elSignal.innerText = analytics.signal_jump || 0;
+    // Prefer column selected by user for charts; fallback to analytics.by_type
+    const colSelect = document.getElementById('chart-column-select');
+    const chosen = colSelect ? colSelect.value : null;
+    if(chosen){
+        // compute counts
+        const map = {};
+        for(const r of fullDataset){
+            const v = (r[chosen] === undefined || r[chosen] === null) ? '' : String(r[chosen]);
+            map[v] = (map[v] || 0) + 1;
+        }
+        updateCharts(map, chosen);
+    } else {
+        updateCharts(analytics.by_type || {});
+    }
+
+    // time series: try to detect timestamp column
+    const tsCol = findTimestampColumn(fullDataset);
+    if(tsCol){
+        const series = aggregateByDate(fullDataset, tsCol);
+        updateTimeChart(series);
+        updateAccidentsChart(series);
+    } else {
+        // clear charts
+        if(window.timeChart) { try{ timeChart.destroy(); }catch(e){} }
+        if(window.accidentsChart) { try{ accidentsChart.destroy(); }catch(e){} }
+    }
+}
+
+function findTimestampColumn(list){
+    if(!list || list.length===0) return null;
+    const candidates = ['timestamp','time','datetime','date','reported_at','created_at','time_stamp','ts','Date','Timestamp'];
+    const keys = Object.keys(list[0]);
+    for(const k of keys){
+        if(candidates.includes(k) || candidates.map(c=>c.toLowerCase()).includes(k.toLowerCase())) return k;
+    }
+    // fallback: heuristics - find column where majority parse to valid date
+    for(const k of keys){
+        let good = 0, checked=0;
+        for(let i=0;i<Math.min(40,list.length);i++){
+            const v = list[i][k];
+            if(v===undefined||v===null) continue;
+            checked++;
+            const d = Date.parse(String(v));
+            if(!isNaN(d)) good++;
+        }
+        if(checked>0 && (good/checked) > 0.6) return k;
+    }
+    return null;
+}
+
+function aggregateByDate(list, col){
+    const map = {};
+    for(const r of list){
+        const v = r[col];
+        if(v===undefined||v===null) continue;
+        const d = new Date(String(v));
+        if(isNaN(d)) continue;
+        const day = d.toISOString().slice(0,10);
+        map[day] = (map[day] || 0)+1;
+    }
+    // sort by date
+    const items = Object.keys(map).sort().map(k=>({ date:k, count: map[k] }));
+    return items;
+}
+
+function updateTimeChart(series){
+    const el = document.getElementById('time-chart');
+    if(!el){ if(window.timeChart) try{ window.timeChart.destroy(); }catch(e){}; return; }
+    const labels = series.map(s=>s.date);
+    const data = series.map(s=>s.count);
+    const ctx = el.getContext('2d');
+    if(window.timeChart) try{ window.timeChart.destroy(); }catch(e){}
+    window.timeChart = new Chart(ctx, { type:'line', data:{ labels, datasets:[{ label:'Violations', data, fill:false, borderColor:'#00e6ff' }] }, options:{responsive:true, maintainAspectRatio:false, scales:{ x:{ type:'category' }, y:{ beginAtZero:true } } } });
+}
+
+// Accidents over time (treating each row as one accident/incident)
+function updateAccidentsChart(series){
+    const el = document.getElementById('accidents-chart');
+    if(!el){ if(window.accidentsChart) try{ window.accidentsChart.destroy(); }catch(e){}; return; }
+    const labels = series.map(s=>s.date);
+    const data = series.map(s=>s.count);
+    const ctx = el.getContext('2d');
+    if(window.accidentsChart) try{ window.accidentsChart.destroy(); }catch(e){}
+    window.accidentsChart = new Chart(ctx, { type:'line', data:{ labels, datasets:[{ label:'Accidents', data, fill:true, backgroundColor:'rgba(255,61,203,0.06)', borderColor:'#ff3dcb' }] }, options:{responsive:true, maintainAspectRatio:false, scales:{ x:{ type:'category' }, y:{ beginAtZero:true } } } });
+}
+
+function renderHistogram(col, bins=10){
+    if(!col) return;
+    const values = fullDataset.map(r=>{
+        const v = r[col]; if(v===undefined||v===null) return NaN; const n=Number(String(v).replace(/,/g, '')); return isFinite(n)?n:NaN;
+    }).filter(x=>!isNaN(x));
+    if(values.length===0){ showToast('No numeric data for ' + col); return; }
+    const min = Math.min(...values); const max = Math.max(...values);
+    const binSize = (max - min) / bins || 1;
+    const counts = new Array(bins).fill(0);
+    values.forEach(v=>{ const idx = Math.min(bins-1, Math.floor((v - min)/binSize)); counts[idx]++; });
+    const labels = counts.map((c,i)=> `${(min + i*binSize).toFixed(2)} - ${(min + (i+1)*binSize).toFixed(2)}`);
+    const ctx = document.getElementById('type-chart').getContext('2d'); if(typeChart) typeChart.destroy();
+    typeChart = new Chart(ctx, { type:'bar', data:{ labels, datasets:[{ label: `Histogram of ${col}`, data: counts, backgroundColor:'#00e6ff' }] }, options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}} });
+    // clear pie chart
+    if(pieChart) pieChart.destroy();
+}
+
+function renderScatter(xcol,ycol){
+    if(!xcol || !ycol){ showToast('Select two columns for scatter'); return; }
+    const pts = [];
+    for(const r of fullDataset){
+        const xv = Number(String(r[xcol]).replace(/,/g,''));
+        const yv = Number(String(r[ycol]).replace(/,/g,''));
+        if(isFinite(xv) && isFinite(yv)) pts.push({x:xv,y:yv});
+    }
+    if(pts.length===0){ showToast('No numeric pairs found for scatter'); return; }
+    const ctx = document.getElementById('type-chart').getContext('2d'); if(typeChart) typeChart.destroy();
+    typeChart = new Chart(ctx, { type:'scatter', data:{ datasets:[{ label: `${ycol} vs ${xcol}`, data: pts, backgroundColor:'#00e6ff' }] }, options:{responsive:true,maintainAspectRatio:false,scales:{ x:{ type:'linear', title:{display:true,text:xcol}}, y:{ title:{display:true,text:ycol}} } } });
+    if(pieChart) pieChart.destroy();
+}
+
+// Generate multiple charts automatically for the dataset
+function clearAutoCharts(){
+    window._autoCharts = window._autoCharts || [];
+    window._autoCharts.forEach(c=>{ try{ if(c.chart) c.chart.destroy(); }catch(e){}; try{ c.el.remove(); }catch(e){} });
+    window._autoCharts = [];
+    const container = document.getElementById('auto-charts'); if(container) container.innerHTML = '';
+}
+
+function makeChartCard(title){
+    const container = document.getElementById('auto-charts');
+    const card = document.createElement('div'); card.className = 'card'; card.style.padding = '12px'; card.style.margin = '0';
+    const h = document.createElement('h4'); h.style.margin='0 0 8px 0'; h.innerText = title; card.appendChild(h);
+    const canvas = document.createElement('canvas'); canvas.width = 480; canvas.height = 220; card.appendChild(canvas);
+    container.appendChild(card);
+    return { el: card, canvas };
+}
+
+function generateAllCharts(){
+    // clear previous
+    clearAutoCharts();
+    if(!fullDataset || fullDataset.length===0){ showToast('No data to generate charts'); return; }
+    const types = window._colTypes || { numeric:[], date:[], categorical:[], all:[] };
+
+    // 1) Time series chart if timestamp available
+    const ts = findTimestampColumn(fullDataset);
+    if(ts){
+        const items = aggregateByDate(fullDataset, ts);
+        const card = makeChartCard('Time Series — ' + ts);
+        const ctx = card.canvas.getContext('2d');
+        const ch = new Chart(ctx,{ type:'line', data:{ labels: items.map(i=>i.date), datasets:[{ label:'Count', data: items.map(i=>i.count), borderColor:'#00e6ff', fill:false }] }, options:{responsive:true,maintainAspectRatio:false} });
+        window._autoCharts.push({ chart: ch, el: card.el });
+    }
+
+    // 2) Categorical: top 2 categorical columns
+    const cats = types.categorical.slice(0,3);
+    if(cats.length===0 && (types.all||[]).includes('type')) cats.push('type');
+    cats.forEach(c=>{
+        const counts = {};
+        for(const r of fullDataset){ const v = (r[c]===undefined||r[c]===null)?'':String(r[c]); counts[v] = (counts[v]||0)+1; }
+        const entries = Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,12);
+        const labels = entries.map(e=>e[0]); const data = entries.map(e=>e[1]);
+        const card = makeChartCard('Categorical — ' + c);
+        const ctx = card.canvas.getContext('2d');
+        const ch = new Chart(ctx,{ type:'bar', data:{ labels, datasets:[{ label:'Count', data, backgroundColor: labels.map((l,i)=>['#00e6ff','#ff3dcb','#00ff9d','#ffc857','#8e44ad'][i%5]) }] }, options:{indexAxis:'y',responsive:true,maintainAspectRatio:false} });
+        window._autoCharts.push({ chart: ch, el: card.el });
+
+        // add pie next to it
+        const card2 = makeChartCard('Distribution — ' + c);
+        const ctx2 = card2.canvas.getContext('2d');
+        const ch2 = new Chart(ctx2,{ type:'pie', data:{ labels, datasets:[{ data, backgroundColor: labels.map((l,i)=>['#00e6ff','#ff3dcb','#00ff9d','#ffc857','#8e44ad'][i%5]) }] }, options:{responsive:true,maintainAspectRatio:false} });
+        window._autoCharts.push({ chart: ch2, el: card2.el });
+    });
+
+    // 3) Numeric histograms: top 2 numeric columns
+    (types.numeric||[]).slice(0,2).forEach(nc=>{
+        const values = fullDataset.map(r=>{ const v=r[nc]; const n=Number(String(v).replace(/,/g,'')); return isFinite(n)?n:NaN; }).filter(x=>!isNaN(x));
+        if(values.length===0) return;
+        const bins = 12; const min=Math.min(...values); const max=Math.max(...values); const binSize=(max-min)/bins || 1; const counts=new Array(bins).fill(0); values.forEach(v=>{ const idx=Math.min(bins-1, Math.floor((v-min)/binSize)); counts[idx]++; });
+        const labels = counts.map((c,i)=>`${(min+i*binSize).toFixed(2)} - ${(min+(i+1)*binSize).toFixed(2)}`);
+        const card = makeChartCard('Histogram — ' + nc);
+        const ctx = card.canvas.getContext('2d');
+        const ch = new Chart(ctx,{ type:'bar', data:{ labels, datasets:[{ label:'Count', data: counts, backgroundColor:'#00e6ff' }] }, options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}} });
+        window._autoCharts.push({ chart: ch, el: card.el });
+    });
+
+    // 4) Scatter: pick first two numeric columns
+    if((types.numeric||[]).length>=2){
+        const x = types.numeric[0], y = types.numeric[1];
+        const pts = [];
+        for(const r of fullDataset){ const xv=Number(String(r[x]).replace(/,/g,'')); const yv=Number(String(r[y]).replace(/,/g,'')); if(isFinite(xv)&&isFinite(yv)) pts.push({x:xv,y:yv}); }
+        if(pts.length>0){
+            const card = makeChartCard(`Scatter — ${y} vs ${x}`);
+            const ctx = card.canvas.getContext('2d');
+            const ch = new Chart(ctx,{ type:'scatter', data:{ datasets:[{ label:`${y} vs ${x}`, data: pts, backgroundColor:'#00e6ff' }] }, options:{responsive:true,maintainAspectRatio:false,scales:{ x:{ title:{display:true,text:x}}, y:{ title:{display:true,text:y}} } } });
+            window._autoCharts.push({ chart: ch, el: card.el });
+        }
+    }
+}
+
+function updateCharts(by_type, columnName){
+    // by_type: map value->count. columnName optional: used for labels
+    const labels = Object.keys(by_type || {}).filter(l=> l !== '').slice(0,50); // limit labels
+    const data = labels.map(k=> by_type[k] || 0);
+    const ctx = document.getElementById('type-chart').getContext('2d');
+    if(typeChart) typeChart.destroy();
+    const titleLabel = columnName ? `Counts of ${columnName}` : 'Violations by Type';
+    typeChart = new Chart(ctx, { type:'bar', data:{ labels, datasets:[{ label:'Count', data, backgroundColor:labels.map((l,i)=>['#00e6ff','#ff3dcb','#00ff9d','#ffc857','#8e44ad'][i%5]) }] }, options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{title:{display:true,text:titleLabel}}} });
+
+    // pie chart (show top values only)
+    const pctx = document.getElementById('pie-chart').getContext('2d');
+    if(pieChart) pieChart.destroy();
+    pieChart = new Chart(pctx, { type:'pie', data:{ labels, datasets:[{ data, backgroundColor:labels.map((l,i)=>['#00e6ff','#ff3dcb','#00ff9d','#ffc857','#8e44ad'][i%5]) }] }, options:{responsive:true,maintainAspectRatio:false,plugins:{title:{display:true,text: columnName ? `Distribution of ${columnName}` : 'Distribution'}}} });
+
+    // if no labels/data, show placeholder
+    if(labels.length === 0){
+        // clear charts with a minimal empty dataset
+        if(typeChart) { try{ typeChart.destroy(); }catch(e){} }
+        if(pieChart) { try{ pieChart.destroy(); }catch(e){} }
+        const ctx2 = document.getElementById('type-chart').getContext('2d');
+        typeChart = new Chart(ctx2, { type:'bar', data:{ labels:['No data'], datasets:[{ label:'Count', data:[0], backgroundColor:['#444'] }] }, options:{indexAxis:'y',responsive:true,maintainAspectRatio:false} });
+    }
+}
+
+function downloadCSV(){
+    if(!fullDataset || fullDataset.length===0){ showToast('No data'); return; }
+    const cols = Array.from(fullDataset.reduce((s,row)=>{Object.keys(row).forEach(k=>s.add(k));return s;}, new Set()));
+    const escape = v => '"' + String(v === undefined || v === null ? '' : v).replace(/"/g,'""') + '"';
+    const lines = [cols.join(',')].concat(fullDataset.map(r=>cols.map(c=>escape(r[c])).join(',')));
+    const csv = lines.join('\n');
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href=url; a.download='dataset.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+
+function applySearch(){
+    const q = document.getElementById('search-input').value.trim().toLowerCase();
+    if(!q){ renderTable(fullDataset); return; }
+    const filtered = fullDataset.filter(r=>{
+        return Object.values(r).some(v=> String(v).toLowerCase().includes(q));
+    });
+    renderTable(filtered);
+}
+
+function deleteFilesOnlyFromDataset(){
+    // ask server for uploads count first
+    fetch(`${base}/uploaded-files`).then(r=>r.json()).then(json=>{
+        const cnt = json && (json.count || (json.files && json.files.length)) || 0;
+        if(!cnt){ showToast('No uploaded files to delete'); return; }
+        if(!confirm(`This will delete ${cnt} uploaded file${cnt>1? 's' : ''}. Continue?`)) return;
+        fetch(`${base}/delete-uploaded-files`, { method: 'POST' })
+        .then(r=>r.json())
+        .then(res=>{
+            if(res && typeof res.deleted === 'number'){
+                showToast(`Deleted ${res.deleted} file${res.deleted!==1 ? 's' : ''}`);
+                // no need to refresh records (we are deleting only files)
+            } else {
+                showToast('Deletion failed');
+                console.error('Delete response', res);
+            }
+        })
+        .catch(err=>{ showToast('Network error while deleting files'); console.error(err); });
+    }).catch(err=>{ showToast('Could not fetch uploads info'); console.error(err); });
+}
+
+// Clear dataset button handler
+function clearDatasetFromPage(){
+    const deleteFiles = !!document.getElementById('dataset-clear-delete')?.checked;
+    const msg = deleteFiles ? 'This will remove all records AND delete uploaded files from disk. Continue?' : 'Clear all recorded violations? This will not delete uploaded files. Continue?';
+    if(!confirm(msg)) return;
+    fetch(`${base}/clear-dataset`, { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify({delete_files:deleteFiles}) })
+    .then(r=>r.json()).then(json=>{
+        if(json && json.cleared){
+            showToast('Data cleared');
+            refreshTable();
+            clearAutoCharts();
+            document.getElementById('dataset-table').querySelector('tbody').innerHTML = '<tr><td class="muted">No data</td></tr>';
+        } else {
+            showToast('Clear failed');
+        }
+    }).catch(err=>{ showToast('Network error'); console.error(err); });
+}
+
+// Upload helper for dataset page
+function handleDatasetFileSelect(files){
+    if(!files || files.length===0){ showToast('No file selected'); return; }
+    const file = files[0];
+    // quick check
+    if(typeof file.size === 'number' && file.size === 0){ showToast('Selected file appears empty'); return; }
+    uploadDatasetFromDatasetPage(file);
+    // clear input so selecting same file again works
+    document.getElementById('dataset-upload-input').value = '';
+}
+
+function uploadDatasetFromDatasetPage(file){
+    if(!file) return;
+    const replace = !!document.getElementById('dataset-upload-replace')?.checked;
+
+    // UI setup
+    const progWrap = document.getElementById('dataset-upload-progress');
+    const progBar = document.getElementById('dataset-upload-progress-bar');
+    const progText = document.getElementById('dataset-upload-progress-text');
+    if(progWrap){ progWrap.style.display = 'flex'; progBar.style.width = '0%'; progText.innerText = '0%'; }
+    document.getElementById('dataset-upload-label').style.pointerEvents = 'none';
+    document.getElementById('dataset-upload-label').style.opacity = 0.6;
+
+    // XHR for progress + cancel
+    const xhr = new XMLHttpRequest();
+    window._datasetUploadXhr = xhr;
+    xhr.open('POST', `${base}/upload-dataset`);
+
+    xhr.upload.onprogress = function(e){
+        if(e.lengthComputable){
+            const pct = Math.round((e.loaded / e.total) * 100);
+            if(progBar) progBar.style.width = pct + '%';
+            if(progText) progText.innerText = pct + '%';
+            showToast('Uploading... ' + pct + '%');
+        }
+    };
+
+    const timeoutMs = 60 * 1000; // 60s
+    const to = setTimeout(()=>{ try{ xhr.abort(); }catch(e){}; window._datasetUploadXhr = null; if(progWrap) progWrap.style.display='none'; document.getElementById('dataset-upload-label').style.pointerEvents=''; document.getElementById('dataset-upload-label').style.opacity=1.0; showToast('Upload timed out'); }, timeoutMs);
+
+    xhr.onload = function(){
+        clearTimeout(to);
+        window._datasetUploadXhr = null;
+        if(progWrap) progWrap.style.display = 'none';
+        document.getElementById('dataset-upload-label').style.pointerEvents=''; document.getElementById('dataset-upload-label').style.opacity=1.0;
+        try{
+            const json = JSON.parse(xhr.responseText || '{}');
+            if(xhr.status >= 200 && xhr.status < 300 && json && json.uploaded){
+                showToast(`Loaded ${json.total} records`);
+                refreshTable();
+                try{ updateAnalysis({ total_violations: json.total }); }catch(e){}
+            } else {
+                showToast((json && json.error) ? ('Upload failed: ' + json.error) : 'Upload failed');
+                console.error('Upload failed', json);
+            }
+        }catch(err){ showToast('Upload response parse error'); console.error(err); }
+    };
+
+    xhr.onerror = function(){
+        clearTimeout(to);
+        window._datasetUploadXhr = null;
+        if(progWrap) progWrap.style.display = 'none';
+        document.getElementById('dataset-upload-label').style.pointerEvents=''; document.getElementById('dataset-upload-label').style.opacity=1.0;
+        showToast('Upload error');
+    };
+
+    const fd = new FormData(); fd.append('file', file); fd.append('mode', replace ? 'replace' : 'append');
+    xhr.send(fd);
+}
+
+function cancelDatasetUpload(){
+    if(window._datasetUploadXhr){ try{ window._datasetUploadXhr.abort(); }catch(e){} window._datasetUploadXhr = null; }
+    const progWrap = document.getElementById('dataset-upload-progress'); if(progWrap) progWrap.style.display='none';
+    document.getElementById('dataset-upload-label').style.pointerEvents=''; document.getElementById('dataset-upload-label').style.opacity=1.0;
+    showToast('Upload cancelled');
+}
+
+// Initialize
+refreshTable();
+</script>
+
+<div id="toast" class="toast" style="display:none"> </div>
+</body>
+</html>
